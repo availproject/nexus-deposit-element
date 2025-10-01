@@ -13,7 +13,7 @@ import Header from "./components/header";
 // import { Label } from "./components/ui/label";
 
 function App() {
-  // const { connector, status } = useAccount();
+  // const { connector, status, address } = useAccount();
   // const { handleInit, nexusSDK, loading } = useNexus();
 
   // const init = async () => {
@@ -57,6 +57,14 @@ function App() {
               Unified Balance
             </Label>
             <UnifiedBalance />
+          </div>
+        )}*/}
+        {/*{nexusSDK && (
+          <div className="w-full flex flex-col items-center gap-y-3">
+            <Label className="w-fit font-semibold text-xl">
+              Fast Bridge
+            </Label>
+            <FastBridge connectedAddress={address} />
           </div>
         )}*/}
       </div>
