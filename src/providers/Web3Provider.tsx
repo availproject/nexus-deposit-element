@@ -50,14 +50,14 @@ const Web3Provider = ({ children }: { children: React.ReactNode }) => {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider modalSize="compact">
-          {/*<NexusProvider
+          {/* <NexusProvider
             config={{
               network: "mainnet",
               debug: true,
             }}
-          >*/}
+          > */}
           {children}
-          {/*</NexusProvider>*/}
+          {/* </NexusProvider> */}
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

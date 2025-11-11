@@ -9,7 +9,7 @@ import Header from "./components/header";
 // import { Label } from "./components/ui/label";
 // import { useNexus } from "./components/nexus/NexusProvider";
 // import { useAccount } from "wagmi";
-// import { parseUnits } from "viem";
+// import { encodeFunctionData, parseUnits, type Abi } from "viem";
 // import UnifiedBalance from "./components/unified-balance/unified-balance";
 // import {
 //   SUPPORTED_CHAINS,
@@ -83,12 +83,12 @@ function App() {
                 address={address ?? `0x`}
                 token="USDT"
                 chain={SUPPORTED_CHAINS.ARBITRUM}
-                embed={true} // switch to false to use as a modal
                 destinationLabel="on Aave v3"
                 heading="Deposit USDT"
-                depositExecute={{
-                  contractAddress: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
-                  contractAbi: [
+                depositExecute={(token, amount, _chainId, user) => {
+                  const contractAddress =
+                    "0x794a61358D6845594F94dc1DB02A252b5b4814aD" as const;
+                  const abi: Abi = [
                     {
                       name: "supply",
                       type: "function",
@@ -101,14 +101,38 @@ function App() {
                       ],
                       outputs: [],
                     },
-                  ] as const,
-                  functionName: "supply",
-                  buildFunctionParams: (token, amount, _chainId, user) => {
-                    const decimals = TOKEN_METADATA[token].decimals;
-                    const amountWei = parseUnits(amount, decimals);
-                    const tokenAddr = TOKEN_CONTRACT_ADDRESSES[token][_chainId];
-                    return { functionParams: [tokenAddr, amountWei, user, 0] };
-                  },
+                  ];
+                  const decimals = TOKEN_METADATA[token].decimals;
+                  const amountWei = parseUnits(amount, decimals);
+                  if (token === "ETH") {
+                    throw new Error(
+                      "ETH is native and not supported for this execute builder"
+                    );
+                  }
+                  const chainMap = TOKEN_CONTRACT_ADDRESSES[token];
+                  if (!(_chainId in chainMap)) {
+                    throw new Error(
+                      "Selected chain is not supported for this token"
+                    );
+                  }
+                  const tokenAddr = chainMap[_chainId as keyof typeof chainMap];
+                  const encoded = encodeFunctionData({
+                    abi: abi,
+                    functionName: "supply",
+                    args: [tokenAddr, amountWei, user, 0],
+                  });
+                  if (!encoded) {
+                    throw new Error("Failed to encode contract call");
+                  }
+                  return {
+                    to: contractAddress,
+                    data: encoded,
+                    tokenApproval: {
+                      token,
+                      amount: amountWei,
+                      spender: contractAddress,
+                    },
+                  };
                 }}
               />
             </div>
