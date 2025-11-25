@@ -34,9 +34,9 @@ function App() {
   // };
 
   return (
-    <div className="w-full min-h-screen overflow-hidden">
+    <div className="min-h-dvh flex flex-col">
       <Header />
-      <div className="flex flex-col gap-y-4 items-center justify-center w-full min-h-screen border border-border">
+      <main className="flex flex-col gap-y-4 items-center justify-center w-full flex-1 border-t border-border overflow-x-hidden p-16">
         <p className="text-center text-2xl font-bold">
           Nexus Elements Template
         </p>
@@ -138,7 +138,7 @@ function App() {
             </div>
           )} */}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
