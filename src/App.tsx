@@ -1,143 +1,152 @@
-/**
- * Uncomment lines after installing any Nexus Element
- * @from https://elements.nexus.availproject.org/
- */
+import {
+  CHAIN_METADATA,
+  SUPPORTED_CHAINS,
+  TOKEN_CONTRACT_ADDRESSES,
+  type EthereumProvider,
+} from "@avail-project/nexus-core";
+import { LoaderPinwheelIcon } from "lucide-react";
+import { useCallback, useEffect } from "react";
+import { type Abi, encodeFunctionData } from "viem";
+import { useAccount, useConnectorClient } from "wagmi";
+import NexusDeposit from "./components/deposit/nexus-deposit";
+import { useNexus } from "./components/nexus/NexusProvider";
+import { Button } from "./components/ui/button";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 
-import Header from "./components/header";
-// import { Button } from "./components/ui/button";
-// import { LoaderPinwheelIcon } from "lucide-react";
-// import { Label } from "./components/ui/label";
-// import { useNexus } from "./components/nexus/NexusProvider";
-// import { useAccount } from "wagmi";
-// import { encodeFunctionData, parseUnits, type Abi } from "viem";
-// import UnifiedBalance from "./components/unified-balance/unified-balance";
-// import {
-//   SUPPORTED_CHAINS,
-//   TOKEN_CONTRACT_ADDRESSES,
-//   TOKEN_METADATA,
-//   type EthereumProvider,
-// } from "@avail-project/nexus-core";
-// import NexusDeposit from "./components/deposit/deposit";
-// import FastBridge from "./components/fast-bridge/fast-bridge";
+const DESTINATION_CHAIN_ID = SUPPORTED_CHAINS.MEGAETH;
+const DESTINATION_TOKEN_SYMBOL = "USDM" as const;
+const DESTINATION_TOKEN_ADDRESS =
+  TOKEN_CONTRACT_ADDRESSES["USDM"][DESTINATION_CHAIN_ID];
+const AAVE_V3_POOL_ADDRESS =
+  "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5" as const;
 
 function App() {
-  // const { connector, status, address } = useAccount();
-  // const { handleInit, nexusSDK, loading } = useNexus();
+  const { connector, status } = useAccount();
+  const { data: walletClient } = useConnectorClient();
+  const { handleInit, nexusSDK, loading, fetchSwapBalance } = useNexus();
 
-  // const init = async () => {
-  //   try {
-  //     const provider = (await connector?.getProvider()) as EthereumProvider;
-  //     await handleInit(provider);
-  //   } catch (error) {
-  //     console.error("Error initializing Nexus:", error);
-  //   }
-  // };
+  const initNexus = useCallback(async () => {
+    if (status !== "connected") return;
+
+    try {
+      const mobileProvider = walletClient
+        ? ({
+            request: (args: unknown) => walletClient.request(args as never),
+          } as EthereumProvider)
+        : undefined;
+      const desktopProvider = (await connector?.getProvider()) as
+        | EthereumProvider
+        | undefined;
+      const provider = mobileProvider ?? desktopProvider;
+
+      if (!provider || typeof provider.request !== "function") return;
+      await handleInit(provider);
+    } catch (error) {
+      console.error("Error initializing Nexus:", error);
+    }
+  }, [connector, handleInit, status, walletClient]);
+
+  useEffect(() => {
+    if (status !== "connected" || nexusSDK || loading) return;
+    void initNexus();
+  }, [initNexus, loading, nexusSDK, status]);
 
   return (
     <div className="min-h-dvh flex flex-col">
-      <Header />
       <main className="flex flex-col gap-y-4 items-center justify-center w-full flex-1 border-t border-border overflow-x-hidden p-16">
-        <p className="text-center text-2xl font-bold">
-          Nexus Elements Template
-        </p>
-        <a
-          href="https://elements.nexus.availproject.org/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <p className="text-center text-xl font-semibold text-primary underline">
-            Install Nexus Elements
-          </p>
-        </a>
-
-        {/* {!nexusSDK && status === "connected" && (
-          <Button onClick={init}>
+        {!nexusSDK && status === "connected" && (
+          <Button onClick={initNexus} disabled={loading}>
             {loading ? (
               <LoaderPinwheelIcon className="size-5 animate-spin" />
             ) : (
-              "Initialize Nexus"
+              "Deposit with Nexus"
             )}
           </Button>
-        )} */}
-        <div className="flex items-start gap-x-4 w-full max-w-6xl">
-          {/* {nexusSDK && (
-            <div className="w-full flex flex-col items-center gap-y-3">
-              <Label className="w-fit font-semibold text-xl">
-                Unified Balance
-              </Label>
-              <UnifiedBalance />
-            </div>
-          )} */}
-          {/* {nexusSDK && address && (
-            <div className="w-full flex flex-col items-center gap-y-3">
-              <Label className="w-fit font-semibold text-xl">Fast Bridge</Label>
-              <FastBridge connectedAddress={address} />
-            </div>
-          )} */}
-          {/* {nexusSDK && address && (
-            <div className="w-full flex flex-col items-center gap-y-3">
-              <Label className="w-fit font-semibold text-xl">
-                Nexus Deposit
-              </Label>
-              <NexusDeposit
-                address={address ?? `0x`}
-                token="USDT"
-                chain={SUPPORTED_CHAINS.ARBITRUM}
-                destinationLabel="on Aave v3"
-                heading="Deposit USDT"
-                depositExecute={(token, amount, _chainId, user) => {
-                  const contractAddress =
-                    "0x794a61358D6845594F94dc1DB02A252b5b4814aD" as const;
-                  const abi: Abi = [
-                    {
-                      name: "supply",
-                      type: "function",
-                      stateMutability: "nonpayable",
-                      inputs: [
-                        { name: "asset", type: "address" },
-                        { name: "amount", type: "uint256" },
-                        { name: "onBehalfOf", type: "address" },
-                        { name: "referralCode", type: "uint16" },
-                      ],
-                      outputs: [],
-                    },
-                  ];
-                  const decimals = TOKEN_METADATA[token].decimals;
-                  const amountWei = parseUnits(amount, decimals);
-                  if (token === "ETH") {
-                    throw new Error(
-                      "ETH is native and not supported for this execute builder"
-                    );
-                  }
-                  const chainMap = TOKEN_CONTRACT_ADDRESSES[token];
-                  if (!(_chainId in chainMap)) {
-                    throw new Error(
-                      "Selected chain is not supported for this token"
-                    );
-                  }
-                  const tokenAddr = chainMap[_chainId as keyof typeof chainMap];
-                  const encoded = encodeFunctionData({
-                    abi: abi,
-                    functionName: "supply",
-                    args: [tokenAddr, amountWei, user, 0],
-                  });
-                  if (!encoded) {
-                    throw new Error("Failed to encode contract call");
-                  }
-                  return {
-                    to: contractAddress,
-                    data: encoded,
-                    tokenApproval: {
-                      token,
-                      amount: amountWei,
-                      spender: contractAddress,
-                    },
-                  };
-                }}
-              />
-            </div>
-          )} */}
-        </div>
+        )}
+
+        {nexusSDK && (
+          <div className="w-full max-w-md">
+            <NexusDeposit
+              embed
+              heading="Deposit USDm on Aave Megaeth"
+              destination={{
+                chainId: DESTINATION_CHAIN_ID,
+                tokenAddress: DESTINATION_TOKEN_ADDRESS,
+                tokenSymbol: DESTINATION_TOKEN_SYMBOL,
+                tokenDecimals: 18,
+                tokenLogo:
+                  "https://raw.githubusercontent.com/availproject/nexus-assets/main/tokens/usdm/logo.png",
+                label: "Deposit USDm on Aave Megaeth",
+                estimatedTime: "~30s",
+                depositTargetLogo: "/aave.svg",
+                gasTokenSymbol:
+                  CHAIN_METADATA[DESTINATION_CHAIN_ID].nativeCurrency.symbol,
+                explorerUrl:
+                  CHAIN_METADATA[DESTINATION_CHAIN_ID].blockExplorerUrls[0],
+              }}
+              executeDeposit={(
+                _tokenSymbol,
+                tokenAddress,
+                amount,
+                _chainId,
+                user,
+              ) => {
+                const abi: Abi = [
+                  {
+                    inputs: [
+                      {
+                        internalType: "address",
+                        name: "asset",
+                        type: "address",
+                      },
+                      {
+                        internalType: "uint256",
+                        name: "amount",
+                        type: "uint256",
+                      },
+                      {
+                        internalType: "address",
+                        name: "onBehalfOf",
+                        type: "address",
+                      },
+                      {
+                        internalType: "uint16",
+                        name: "referralCode",
+                        type: "uint16",
+                      },
+                    ],
+                    name: "supply",
+                    outputs: [],
+                    stateMutability: "nonpayable",
+                    type: "function",
+                  },
+                ];
+                const data = encodeFunctionData({
+                  abi,
+                  functionName: "supply",
+                  args: [tokenAddress, amount, user, 0],
+                });
+
+                return {
+                  to: AAVE_V3_POOL_ADDRESS,
+                  data,
+                  tokenApproval: {
+                    token: tokenAddress,
+                    amount,
+                    spender: AAVE_V3_POOL_ADDRESS,
+                  },
+                };
+              }}
+              onSuccess={() => {
+                void fetchSwapBalance();
+              }}
+              onError={(message) => {
+                console.error("Deposit failed:", message);
+              }}
+            />
+          </div>
+        )}
+        {status !== "connected" && <ConnectButton />}
       </main>
     </div>
   );

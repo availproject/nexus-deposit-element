@@ -18,7 +18,7 @@ import {
   polygonAmoy,
 } from "wagmi/chains";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
-// import NexusProvider from "@/components/nexus/NexusProvider";
+import NexusProvider from "@/components/nexus/NexusProvider";
 
 const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
 
@@ -50,14 +50,14 @@ const Web3Provider = ({ children }: { children: React.ReactNode }) => {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider modalSize="compact">
-          {/* <NexusProvider
+          <NexusProvider
             config={{
               network: "mainnet",
               debug: true,
             }}
-          > */}
+          >
           {children}
-          {/* </NexusProvider> */}
+          </NexusProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
