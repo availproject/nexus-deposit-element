@@ -73,6 +73,30 @@ pnpm dev
 
 Open the URL shown in your terminal. Connect your wallet via the RainbowKit button. If you left the init button enabled, click “Initialize Nexus” to start the SDK, then use the installed element(s).
 
+### 7) Embed only the Deposit element
+
+This app exposes a deposit-only embed view at:
+
+`/embed/deposit`
+
+Example local URL:
+
+`http://localhost:5173/embed/deposit`
+
+Use it from `availproject.org` with an iframe:
+
+```html
+<iframe
+  src="https://<your-deployed-domain>/embed/deposit"
+  title="Nexus Deposit"
+  style="width: 100%; max-width: 420px; min-height: 640px; border: 0;"
+  loading="lazy"
+  referrerpolicy="strict-origin-when-cross-origin"
+></iframe>
+```
+
+If you want wallet extension support to be most reliable, host this on a trusted first-party Avail domain/subdomain.
+
 ### Project scripts
 
 - **dev**: start the Vite dev server
