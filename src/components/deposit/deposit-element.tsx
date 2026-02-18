@@ -1,10 +1,7 @@
-"use client";
-
 import {
   CHAIN_METADATA,
   SUPPORTED_CHAINS,
   TOKEN_CONTRACT_ADDRESSES,
-  TOKEN_METADATA,
   type EthereumProvider,
 } from "@avail-project/nexus-core";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -20,25 +17,41 @@ interface DepositElementProps {
   showInlineConnectButton?: boolean;
 }
 
-const DESTINATION_CHAIN_ID = SUPPORTED_CHAINS.ARBITRUM;
-const DESTINATION_TOKEN_SYMBOL = "USDT" as const;
+const DESTINATION_CHAIN_ID = SUPPORTED_CHAINS.MEGAETH;
+const DESTINATION_TOKEN_SYMBOL = "USDM" as const;
 const DESTINATION_TOKEN_ADDRESS =
   TOKEN_CONTRACT_ADDRESSES[DESTINATION_TOKEN_SYMBOL][DESTINATION_CHAIN_ID];
 const AAVE_V3_POOL_ADDRESS =
-  "0x794a61358D6845594F94dc1DB02A252b5b4814aD" as const;
+  "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5" as const;
 
 const DEPOSIT_ABI: Abi = [
   {
-    name: "supply",
-    type: "function",
-    stateMutability: "nonpayable",
     inputs: [
-      { name: "asset", type: "address" },
-      { name: "amount", type: "uint256" },
-      { name: "onBehalfOf", type: "address" },
-      { name: "referralCode", type: "uint16" },
+      {
+        internalType: "address",
+        name: "asset",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "amount",
+        type: "uint256",
+      },
+      {
+        internalType: "address",
+        name: "onBehalfOf",
+        type: "address",
+      },
+      {
+        internalType: "uint16",
+        name: "referralCode",
+        type: "uint16",
+      },
     ],
+    name: "supply",
     outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
   },
 ];
 
@@ -108,19 +121,29 @@ const DepositElement = ({
     <div className="w-full max-w-md">
       <NexusDeposit
         embed
-        heading="Deposit USDT"
+        heading="Deposit USDm"
         destination={{
           chainId: DESTINATION_CHAIN_ID,
           tokenAddress: DESTINATION_TOKEN_ADDRESS,
           tokenSymbol: DESTINATION_TOKEN_SYMBOL,
-          tokenDecimals: TOKEN_METADATA[DESTINATION_TOKEN_SYMBOL].decimals,
-          tokenLogo: TOKEN_METADATA[DESTINATION_TOKEN_SYMBOL].icon,
-          label: "on Aave v3",
+          tokenDecimals: 18,
+          tokenLogo:
+            "https://raw.githubusercontent.com/availproject/nexus-assets/main/tokens/usdm/logo.png",
+          label: "Deposit USDm on Aave Megaeth",
           estimatedTime: "~30s",
-          gasTokenSymbol: CHAIN_METADATA[DESTINATION_CHAIN_ID].nativeCurrency.symbol,
-          explorerUrl: CHAIN_METADATA[DESTINATION_CHAIN_ID].blockExplorerUrls[0],
+          gasTokenSymbol:
+            CHAIN_METADATA[DESTINATION_CHAIN_ID].nativeCurrency.symbol,
+          explorerUrl:
+            CHAIN_METADATA[DESTINATION_CHAIN_ID].blockExplorerUrls[0],
+          depositTargetLogo: "/aave.svg",
         }}
-        executeDeposit={(_tokenSymbol, tokenAddress, amount, _chainId, user) => {
+        executeDeposit={(
+          _tokenSymbol,
+          tokenAddress,
+          amount,
+          _chainId,
+          user,
+        ) => {
           const data = encodeFunctionData({
             abi: DEPOSIT_ABI,
             functionName: "supply",

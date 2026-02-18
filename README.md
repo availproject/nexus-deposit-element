@@ -75,19 +75,19 @@ Open the URL shown in your terminal. Connect your wallet via the RainbowKit butt
 
 ### 7) Embed only the Deposit element
 
-This app exposes a deposit-only embed view at:
+This app renders the deposit element directly on the root path:
 
-`/embed/deposit`
+`/`
 
 Example local URL:
 
-`http://localhost:5173/embed/deposit`
+`http://localhost:5173/`
 
 Use it from `availproject.org` with an iframe:
 
 ```html
 <iframe
-  src="https://<your-deployed-domain>/embed/deposit"
+  src="https://<your-deployed-domain>/"
   title="Nexus Deposit"
   style="width: 100%; max-width: 420px; min-height: 640px; border: 0;"
   loading="lazy"
