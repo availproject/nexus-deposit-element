@@ -193,7 +193,7 @@ const TransactionCompleteContainer = ({
                     {usdFormatter.format(
                       widget.feeBreakdown.gasUsd +
                         (widget?.confirmationDetails?.totalFeeUsd ?? 0),
-                    )}
+                    )}{" "}
                     USD
                   </span>
                 </div>
