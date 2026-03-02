@@ -13,10 +13,6 @@ import { useNexus } from "../nexus/NexusProvider";
 import { Button } from "../ui/button";
 import NexusDeposit from "./nexus-deposit";
 
-interface DepositElementProps {
-  showInlineConnectButton?: boolean;
-}
-
 const DESTINATION_CHAIN_ID = SUPPORTED_CHAINS.MEGAETH;
 const DESTINATION_TOKEN_SYMBOL = "USDM" as const;
 const DESTINATION_TOKEN_ADDRESS =
@@ -55,9 +51,7 @@ const DEPOSIT_ABI: Abi = [
   },
 ];
 
-const DepositElement = ({
-  showInlineConnectButton = true,
-}: DepositElementProps) => {
+const DepositElement = () => {
   const { connector, status } = useAccount();
   const { data: walletClient } = useConnectorClient();
   const { handleInit, nexusSDK, loading, fetchSwapBalance } = useNexus();
@@ -89,19 +83,19 @@ const DepositElement = ({
   }, [initNexus, loading, nexusSDK, status]);
 
   if (status !== "connected") {
-    if (!showInlineConnectButton) {
-      return (
-        <p className="text-center text-sm text-muted-foreground">
-          Connect your wallet to continue.
-        </p>
-      );
-    }
     return (
-      <ConnectButton
-        showBalance={false}
-        chainStatus="none"
-        accountStatus="avatar"
-      />
+      <div className="flex flex-col items-center gap-y-4">
+        <p className="text-xl font-semibold text-center">
+          In this demo you can deposit funds directly into MegaEth pool on Aave.{" "}
+          <br />
+          Connect your wallet to try it out.
+        </p>
+        <ConnectButton
+          showBalance={false}
+          chainStatus="none"
+          accountStatus="avatar"
+        />
+      </div>
     );
   }
 
