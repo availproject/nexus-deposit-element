@@ -118,7 +118,13 @@ const NexusDeposit = ({
         resetWidget();
       }
     },
-    [isControlled, onOpenChange, onClose, shouldPreventDialogDismiss, resetWidget],
+    [
+      isControlled,
+      onOpenChange,
+      onClose,
+      shouldPreventDialogDismiss,
+      resetWidget,
+    ],
   );
 
   const handleClose = useCallback(() => {
@@ -132,7 +138,7 @@ const NexusDeposit = ({
     return (
       <Card
         className={cn(
-          "relative w-full max-w-md overflow-hidden transition-[height] duration-200 ease-out",
+          "relative w-full max-w-md overflow-hidden transition-[height] min-h-136 duration-200 ease-out",
           className,
         )}
       >
