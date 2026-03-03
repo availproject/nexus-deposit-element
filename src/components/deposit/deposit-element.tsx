@@ -2,6 +2,7 @@ import {
   CHAIN_METADATA,
   SUPPORTED_CHAINS,
   TOKEN_CONTRACT_ADDRESSES,
+  TOKEN_METADATA,
   type EthereumProvider,
 } from "@avail-project/nexus-core";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -13,8 +14,8 @@ import { useNexus } from "../nexus/NexusProvider";
 import { Button } from "../ui/button";
 import NexusDeposit from "./nexus-deposit";
 
-const DESTINATION_CHAIN_ID = SUPPORTED_CHAINS.MEGAETH;
-const DESTINATION_TOKEN_SYMBOL = "USDM" as const;
+const DESTINATION_CHAIN_ID = SUPPORTED_CHAINS.BASE;
+const DESTINATION_TOKEN_SYMBOL = "USDC" as const;
 const DESTINATION_TOKEN_ADDRESS =
   TOKEN_CONTRACT_ADDRESSES[DESTINATION_TOKEN_SYMBOL][DESTINATION_CHAIN_ID];
 const AAVE_V3_POOL_ADDRESS =
@@ -86,7 +87,7 @@ const DepositElement = () => {
     return (
       <div className="flex flex-col items-center gap-y-4">
         <p className="text-xl font-semibold text-center">
-          In this demo you can deposit funds directly into MegaEth pool on Aave.{" "}
+          In this demo you can deposit funds directly into Base pool on Aave.{" "}
           <br />
           Connect your wallet to try it out.
         </p>
@@ -115,15 +116,14 @@ const DepositElement = () => {
     <div className="w-full max-w-md">
       <NexusDeposit
         embed
-        heading="Deposit USDm"
+        heading="Deposit USDC"
         destination={{
           chainId: DESTINATION_CHAIN_ID,
           tokenAddress: DESTINATION_TOKEN_ADDRESS,
           tokenSymbol: DESTINATION_TOKEN_SYMBOL,
-          tokenDecimals: 18,
-          tokenLogo:
-            "https://raw.githubusercontent.com/availproject/nexus-assets/main/tokens/usdm/logo.png",
-          label: "Deposit USDm on Aave Megaeth",
+          tokenDecimals: TOKEN_METADATA[DESTINATION_TOKEN_SYMBOL].decimals,
+          tokenLogo: TOKEN_METADATA[DESTINATION_TOKEN_SYMBOL].icon,
+          label: "Deposit USDC on Aave Base",
           estimatedTime: "~30s",
           gasTokenSymbol:
             CHAIN_METADATA[DESTINATION_CHAIN_ID].nativeCurrency.symbol,
