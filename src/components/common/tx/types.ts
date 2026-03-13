@@ -15,15 +15,21 @@ export type GenericStep<TStep> = {
 /**
  * Normalizes a step to a stable key. Prefers typeID, then type, otherwise JSON.
  */
-export function getStepKey(step: unknown): string {
-  if (!step || typeof step !== "object") return "";
-
-  const value = step as { typeID?: unknown; type?: unknown };
-  if (typeof value.typeID === "string" && value.typeID.length > 0) {
-    return value.typeID;
-  }
-  if (typeof value.type === "string" && value.type.length > 0) {
-    return value.type;
+export function getStepKey(
+  step: unknown,
+): string {
+  if (!step) return "";
+  if (typeof step === "object") {
+    const stepWithMeta = step as { typeID?: unknown; type?: unknown };
+    if (
+      typeof stepWithMeta.typeID === "string" &&
+      stepWithMeta.typeID.length > 0
+    ) {
+      return stepWithMeta.typeID;
+    }
+    if (typeof stepWithMeta.type === "string" && stepWithMeta.type.length > 0) {
+      return stepWithMeta.type;
+    }
   }
   try {
     return JSON.stringify(step);

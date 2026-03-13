@@ -317,7 +317,7 @@ export function useTransactionFlow(props: UseTransactionFlowProps) {
     const selectedTotal =
       !nexusSDK || typeof decimals !== "number"
         ? "0"
-        : formatAmountForDisplay(selectedTotalRaw, decimals, nexusSDK);
+        : formatAmountForDisplay(selectedTotalRaw, decimals);
     const baseSelection = {
       selectedTotal,
       requiredTotal: amount || "0",
@@ -367,12 +367,10 @@ export function useTransactionFlow(props: UseTransactionFlowProps) {
         missingToProceed: formatAmountForDisplay(
           missingToProceedRaw,
           decimals,
-          nexusSDK,
         ),
         missingToSafety: formatAmountForDisplay(
           missingToSafetyRaw,
           decimals,
-          nexusSDK,
         ),
         coverageState,
         coverageToSafetyPercent: coverageBasisPoints / 100,

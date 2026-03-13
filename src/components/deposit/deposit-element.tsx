@@ -116,14 +116,14 @@ const DepositElement = () => {
     <div className="w-full max-w-md">
       <NexusDeposit
         embed
-        heading="Deposit USDC"
+        heading="Deposit USDC on Aave's Base Market"
         destination={{
           chainId: DESTINATION_CHAIN_ID,
           tokenAddress: DESTINATION_TOKEN_ADDRESS,
           tokenSymbol: DESTINATION_TOKEN_SYMBOL,
           tokenDecimals: TOKEN_METADATA[DESTINATION_TOKEN_SYMBOL].decimals,
           tokenLogo: TOKEN_METADATA[DESTINATION_TOKEN_SYMBOL].icon,
-          label: "Deposit USDC on Aave Base",
+          label: "Deposit USDC on Aave's Base Market",
           estimatedTime: "~30s",
           gasTokenSymbol:
             CHAIN_METADATA[DESTINATION_CHAIN_ID].nativeCurrency.symbol,

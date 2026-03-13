@@ -151,10 +151,7 @@ export const createInitialState = (): DepositState => ({
 /**
  * State reducer for deposit widget
  */
-function depositReducer(
-  state: DepositState,
-  action: DepositAction,
-): DepositState {
+function depositReducer(state: DepositState, action: DepositAction): DepositState {
   switch (action.type) {
     case "setStep":
       return {
@@ -229,7 +226,7 @@ export function useDepositState() {
   const [state, dispatch] = useReducer(
     depositReducer,
     undefined,
-    createInitialState,
+    createInitialState
   );
 
   return { state, dispatch };

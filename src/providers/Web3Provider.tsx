@@ -1,10 +1,11 @@
 import "@rainbow-me/rainbowkit/styles.css";
 import {
+  type Chain as RainbowKitChain,
   getDefaultConfig,
   RainbowKitProvider,
   type Theme,
 } from "@rainbow-me/rainbowkit";
-import { WagmiProvider } from "wagmi";
+import { WagmiProvider, type Config as WagmiConfig } from "wagmi";
 import {
   mainnet,
   scroll,
@@ -25,6 +26,22 @@ import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import NexusProvider from "@/components/nexus/NexusProvider";
 
 const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
+const chains = [
+  mainnet,
+  base,
+  sophon,
+  kaia,
+  arbitrum,
+  avalanche,
+  optimism,
+  polygon,
+  scroll,
+  sepolia,
+  baseSepolia,
+  arbitrumSepolia,
+  optimismSepolia,
+  polygonAmoy,
+] as unknown as readonly [RainbowKitChain, ...RainbowKitChain[]];
 
 const rainbowKitTheme: Theme = {
   colors: {
@@ -85,29 +102,14 @@ const rainbowKitTheme: Theme = {
 const config = getDefaultConfig({
   appName: "Nexus Elements",
   projectId: walletConnectProjectId,
-  chains: [
-    mainnet,
-    base,
-    sophon,
-    kaia,
-    arbitrum,
-    avalanche,
-    optimism,
-    polygon,
-    scroll,
-    sepolia,
-    baseSepolia,
-    arbitrumSepolia,
-    optimismSepolia,
-    polygonAmoy,
-  ],
+  chains,
 });
 
 const queryClient = new QueryClient();
 
 const Web3Provider = ({ children }: { children: React.ReactNode }) => {
   return (
-    <WagmiProvider config={config}>
+    <WagmiProvider config={config as unknown as WagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider modalSize="compact" theme={rainbowKitTheme}>
           <NexusProvider

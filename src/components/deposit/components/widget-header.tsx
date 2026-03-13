@@ -65,6 +65,7 @@ const WidgetHeader = ({
       <div className="flex items-center gap-x-4">
         {onBack ? (
           <button
+            type="button"
             onClick={onBack}
             className="h-5 w-5 flex items-center justify-center group/back"
           >
@@ -83,11 +84,11 @@ const WidgetHeader = ({
         )}
         {renderWalletButton()}
       </div>
-
       <h2 className="font-display text-center text-[15px] font-medium tracking-[0.3px]">
         {title}
       </h2>
       <button
+        type="button"
         onClick={onClose}
         className="h-5 w-5 flex items-center justify-center group/close"
       >

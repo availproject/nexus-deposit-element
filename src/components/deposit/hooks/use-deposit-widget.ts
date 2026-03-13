@@ -8,6 +8,7 @@ import type {
   DestinationConfig,
 } from "../types";
 import {
+  ERROR_CODES,
   NEXUS_EVENTS,
   CHAIN_METADATA,
   type SwapStepType,
@@ -26,7 +27,10 @@ import {
 import { type Address, type Hex, formatEther } from "viem";
 import { useAccount } from "wagmi";
 import { useNexus } from "../../nexus/NexusProvider";
-import { SIMULATION_POLL_INTERVAL_MS } from "../constants/widget";
+import {
+  MIN_SELECTABLE_SOURCE_BALANCE_USD,
+  SIMULATION_POLL_INTERVAL_MS,
+} from "../constants/widget";
 
 // Import extracted hooks
 import {
@@ -36,6 +40,7 @@ import {
 } from "./use-deposit-state";
 import { useAssetSelection } from "./use-asset-selection";
 import { useDepositComputed } from "./use-deposit-computed";
+import { resolveDepositSourceSelection } from "../utils";
 
 interface UseDepositProps {
   executeDeposit: (
@@ -50,93 +55,11 @@ interface UseDepositProps {
   onError?: (error: string) => void;
 }
 
-const COINBASE_SPOT_API_BASE = "https://api.coinbase.com/v2/prices";
-const COINBASE_EXCHANGE_RATES_API_BASE =
-  "https://api.coinbase.com/v2/exchange-rates";
-const COINBASE_SPOT_REQUEST_TIMEOUT_MS = 4_000;
-const USD_PEGGED_FALLBACK_RATE = 1;
-
-type CoinbaseSpotPriceResponse = {
-  data?: {
-    amount?: string | number;
-  };
-};
-
-type CoinbaseExchangeRatesResponse = {
-  data?: {
-    rates?: Record<string, string | number>;
-  };
-};
-
-const KNOWN_USD_PEGGED_SYMBOLS = new Set([
-  "USDT",
-  "USDC",
-  "USDS",
-  "DAI",
-  "USDM",
-  "FDUSD",
-  "BUSD",
-  "TUSD",
-  "PYUSD",
-  "GUSD",
-  "LUSD",
-  "USDE",
-  "USDP",
-]);
-
-function toFinitePositiveNumber(value: unknown): number | null {
-  const parsed = Number.parseFloat(String(value));
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return null;
-  }
+function parseUsdAmount(value?: string): number {
+  if (!value) return 0;
+  const parsed = Number.parseFloat(value.replace(/,/g, ""));
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
   return parsed;
-}
-
-function isLikelyUsdPeggedToken(tokenSymbol: string): boolean {
-  const normalized = tokenSymbol.trim().toUpperCase();
-  if (!normalized) return false;
-  return (
-    KNOWN_USD_PEGGED_SYMBOLS.has(normalized) ||
-    /^USD[A-Z0-9]*$/.test(normalized)
-  );
-}
-
-async function fetchJsonWithTimeout<T>(url: string): Promise<T | null> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(
-    () => controller.abort(),
-    COINBASE_SPOT_REQUEST_TIMEOUT_MS,
-  );
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-    });
-    if (!response.ok) return null;
-    return (await response.json()) as T;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-function getCoinbaseSymbolCandidates(tokenSymbol: string): string[] {
-  const normalized = tokenSymbol.trim().toUpperCase();
-  if (!normalized) return [];
-
-  const baseSymbol = normalized.split(/[._-]/)[0] ?? normalized;
-  const wrappedBase =
-    baseSymbol.startsWith("W") && baseSymbol.length > 3
-      ? baseSymbol.slice(1)
-      : null;
-
-  return Array.from(
-    new Set(
-      [normalized, baseSymbol, wrappedBase].filter((symbol): symbol is string =>
-        Boolean(symbol),
-      ),
-    ),
-  );
 }
 
 /**
@@ -156,6 +79,7 @@ export function useDepositWidget(
     fetchSwapBalance,
     getFiatValue,
     exchangeRate,
+    resolveTokenUsdRate,
   } = useNexus();
   const { address } = useAccount();
   const handleNexusError = useNexusError();
@@ -165,28 +89,44 @@ export function useDepositWidget(
   const [pollingEnabled, setPollingEnabled] = useState(false);
 
   // Asset selection state
-  const { assetSelection, setAssetSelection, resetAssetSelection } =
-    useAssetSelection(swapBalance);
+  const {
+    assetSelection,
+    isManualSelection,
+    setAssetSelection,
+    resetAssetSelection,
+  } = useAssetSelection(swapBalance, destination, state.inputs.amount);
 
   // Refs for tracking
   const hasAutoSelected = useRef(false);
   const initialSimulationDone = useRef(false);
   const determiningSwapComplete = useRef(false);
   const lastSimulationTime = useRef(0);
-  const coinbaseRateCache = useRef<Record<string, number>>({});
-  const coinbaseRateRequests = useRef<Record<string, Promise<number | null>>>(
-    {},
-  );
+  const suppressNextWidgetPreviewCancelError = useRef(false);
 
-  const denyActiveSwapIntent = useCallback(() => {
-    try {
-      swapIntent.current?.deny();
-    } catch (error) {
-      console.error("Failed to deny active swap intent", error);
-    } finally {
-      swapIntent.current = null;
-    }
-  }, [swapIntent]);
+  const denyActiveSwapIntent = useCallback(
+    (options?: { suppressUiError?: boolean }) => {
+      const activeSwapIntent =
+        swapIntent.current ?? state.simulation?.swapIntent;
+
+      if (options?.suppressUiError && activeSwapIntent) {
+        suppressNextWidgetPreviewCancelError.current = true;
+      }
+
+      if (!activeSwapIntent) {
+        return;
+      }
+
+      try {
+        activeSwapIntent.deny();
+      } catch (error) {
+        suppressNextWidgetPreviewCancelError.current = false;
+        console.error("Failed to deny active swap intent", error);
+      } finally {
+        swapIntent.current = null;
+      }
+    },
+    [swapIntent, state.simulation],
+  );
 
   // Transaction steps tracking
   const {
@@ -246,104 +186,39 @@ export function useDepositWidget(
     [dispatch],
   );
 
-  const fetchCoinbaseSpotRate = useCallback(async (tokenSymbol: string) => {
-    const normalizedSymbol = tokenSymbol.trim().toUpperCase();
-    if (!normalizedSymbol) return null;
-
-    const cachedRate = coinbaseRateCache.current[normalizedSymbol];
-    if (Number.isFinite(cachedRate) && cachedRate > 0) {
-      return cachedRate;
-    }
-
-    const inFlightRequest = coinbaseRateRequests.current[normalizedSymbol];
-    if (inFlightRequest) {
-      return inFlightRequest;
-    }
-
-    const requestPromise = (async (): Promise<number | null> => {
-      for (const candidate of getCoinbaseSymbolCandidates(normalizedSymbol)) {
-        const cachedCandidateRate = coinbaseRateCache.current[candidate];
-        if (Number.isFinite(cachedCandidateRate) && cachedCandidateRate > 0) {
-          coinbaseRateCache.current[normalizedSymbol] = cachedCandidateRate;
-          return cachedCandidateRate;
-        }
-
-        const spotBody = await fetchJsonWithTimeout<CoinbaseSpotPriceResponse>(
-          `${COINBASE_SPOT_API_BASE}/${encodeURIComponent(candidate)}-USD/spot`,
-        );
-        const spotAmount = toFinitePositiveNumber(spotBody?.data?.amount);
-        if (spotAmount) {
-          coinbaseRateCache.current[candidate] = spotAmount;
-          coinbaseRateCache.current[normalizedSymbol] = spotAmount;
-          return spotAmount;
-        }
-
-        const exchangeRatesBody =
-          await fetchJsonWithTimeout<CoinbaseExchangeRatesResponse>(
-            `${COINBASE_EXCHANGE_RATES_API_BASE}?currency=${encodeURIComponent(candidate)}`,
-          );
-        const exchangeRatesAmount = toFinitePositiveNumber(
-          exchangeRatesBody?.data?.rates?.USD,
-        );
-        if (exchangeRatesAmount) {
-          coinbaseRateCache.current[candidate] = exchangeRatesAmount;
-          coinbaseRateCache.current[normalizedSymbol] = exchangeRatesAmount;
-          return exchangeRatesAmount;
-        }
-      }
-
-      if (isLikelyUsdPeggedToken(normalizedSymbol)) {
-        coinbaseRateCache.current[normalizedSymbol] = USD_PEGGED_FALLBACK_RATE;
-        return USD_PEGGED_FALLBACK_RATE;
-      }
-
-      return null;
-    })();
-
-    coinbaseRateRequests.current[normalizedSymbol] = requestPromise;
-    try {
-      return await requestPromise;
-    } finally {
-      delete coinbaseRateRequests.current[normalizedSymbol];
-    }
-  }, []);
-
-  const resolveDestinationRate = useCallback(async () => {
-    const destinationSymbol = destination.tokenSymbol.toUpperCase();
-    const sdkRate = toFinitePositiveNumber(
-      exchangeRate?.[destination.tokenSymbol] ??
-        exchangeRate?.[destinationSymbol],
-    );
-    if (sdkRate) {
-      return sdkRate;
-    }
-
-    return fetchCoinbaseSpotRate(destinationSymbol);
-  }, [exchangeRate, destination.tokenSymbol, fetchCoinbaseSpotRate]);
-
   /**
    * Start the swap and execute flow with the SDK
    */
   const start = useCallback(
-    (inputs: SwapAndExecuteParams) => {
+    (inputs: SwapAndExecuteParams, targetAmountUsd?: number) => {
       if (!nexusSDK || !inputs || isProcessing) return;
 
       seed(SWAP_EXPECTED_STEPS);
-
-      // Build source list from selected assets
-      const fromSources: Array<{ tokenAddress: Hex; chainId: number }> = [];
-      assetSelection.selectedChainIds.forEach((key) => {
-        const lastDashIndex = key.lastIndexOf("-");
-        const tokenAddress = key.substring(0, lastDashIndex) as Hex;
-        const chainId = parseInt(key.substring(lastDashIndex + 1), 10);
-        fromSources.push({ tokenAddress, chainId });
+      const requiredAmountUsd =
+        targetAmountUsd ?? parseUsdAmount(state.inputs.amount);
+      const { fromSources } = resolveDepositSourceSelection({
+        swapBalance,
+        destination,
+        filter: assetSelection.filter,
+        selectedSourceIds: assetSelection.selectedChainIds,
+        isManualSelection,
+        minimumBalanceUsd: MIN_SELECTABLE_SOURCE_BALANCE_USD,
+        targetAmountUsd: requiredAmountUsd,
       });
+
+      if (fromSources.length === 0) {
+        const message =
+          "No eligible source balances found. A minimum source balance of $1.00 is required.";
+        dispatch({ type: "setError", payload: message });
+        dispatch({ type: "setStatus", payload: "error" });
+        onError?.(message);
+        return;
+      }
 
       const inputsWithSources = {
         ...inputs,
-        fromSources: fromSources.length > 0 ? fromSources : undefined,
+        fromSources,
       };
-
       nexusSDK
         .swapAndExecute(inputsWithSources, {
           onEvent: (event) => {
@@ -378,6 +253,8 @@ export function useDepositWidget(
           },
         })
         .then((data: SwapAndExecuteResult) => {
+          suppressNextWidgetPreviewCancelError.current = false;
+
           // Extract source swaps from the result
           const sourceSwapsFromResult = data.swapResult?.sourceSwaps ?? [];
           sourceSwapsFromResult.forEach((sourceSwap) => {
@@ -468,7 +345,22 @@ export function useDepositWidget(
           });
         })
         .catch((error) => {
-          const { message } = handleNexusError(error);
+          const { code, message } = handleNexusError(error);
+          const isUserRejectedError =
+            code === ERROR_CODES.USER_DENIED_INTENT ||
+            code === ERROR_CODES.USER_DENIED_INTENT_SIGNATURE ||
+            code === ERROR_CODES.USER_DENIED_ALLOWANCE ||
+            code === ERROR_CODES.USER_DENIED_SIWE_SIGNATURE;
+          const shouldSuppressWidgetError =
+            suppressNextWidgetPreviewCancelError.current && isUserRejectedError;
+
+          suppressNextWidgetPreviewCancelError.current = false;
+
+          if (shouldSuppressWidgetError) {
+            onError?.(message);
+            return;
+          }
+
           dispatch({ type: "setError", payload: message });
           dispatch({ type: "setStatus", payload: "error" });
 
@@ -499,11 +391,15 @@ export function useDepositWidget(
       onError,
       handleNexusError,
       assetSelection.selectedChainIds,
+      assetSelection.filter,
+      isManualSelection,
+      swapBalance,
       destination,
       getFiatValue,
       fetchSwapBalance,
       dispatch,
       stopwatch,
+      state.inputs.amount,
     ],
   );
 
@@ -528,7 +424,9 @@ export function useDepositWidget(
         dispatch({ type: "setStatus", payload: "error" });
         return false;
       }
-      const destinationRate = await resolveDestinationRate();
+      const destinationRate = await resolveTokenUsdRate(
+        destination.tokenSymbol,
+      );
       if (
         !destinationRate ||
         !Number.isFinite(destinationRate) ||
@@ -585,13 +483,13 @@ export function useDepositWidget(
       });
       dispatch({ type: "setStatus", payload: "simulation-loading" });
       dispatch({ type: "setSimulationLoading", payload: true });
-      start(newInputs);
+      start(newInputs, totalAmountUsd);
       return true;
     },
     [
       nexusSDK,
       address,
-      resolveDestinationRate,
+      resolveTokenUsdRate,
       destination,
       executeDeposit,
       start,
@@ -656,12 +554,13 @@ export function useDepositWidget(
   const goBack = useCallback(async () => {
     const previousStep = STEP_HISTORY[state.step];
     if (previousStep) {
+      const suppressUiError = state.step === "confirmation" && !isProcessing;
       dispatch({ type: "setError", payload: null });
       dispatch({
         type: "setStep",
         payload: { step: previousStep, direction: "backward" },
       });
-      denyActiveSwapIntent();
+      denyActiveSwapIntent({ suppressUiError });
       initialSimulationDone.current = false;
       lastSimulationTime.current = 0;
       setPollingEnabled(false);
@@ -669,16 +568,24 @@ export function useDepositWidget(
       stopwatch.reset();
       await fetchSwapBalance();
     }
-  }, [state.step, stopwatch, dispatch, denyActiveSwapIntent, fetchSwapBalance]);
+  }, [
+    state.step,
+    isProcessing,
+    stopwatch,
+    dispatch,
+    denyActiveSwapIntent,
+    fetchSwapBalance,
+  ]);
 
   /**
    * Reset widget to initial state
    */
   const reset = useCallback(async () => {
+    const suppressUiError = state.step === "confirmation" && !isProcessing;
     dispatch({ type: "reset" });
     resetAssetSelection();
     resetSteps();
-    denyActiveSwapIntent();
+    denyActiveSwapIntent({ suppressUiError });
     initialSimulationDone.current = false;
     lastSimulationTime.current = 0;
     setPollingEnabled(false);
@@ -692,6 +599,8 @@ export function useDepositWidget(
     resetAssetSelection,
     denyActiveSwapIntent,
     fetchSwapBalance,
+    state.step,
+    isProcessing,
   ]);
 
   /**
@@ -708,6 +617,7 @@ export function useDepositWidget(
       const updated = await swapIntent.current?.refresh();
       if (updated) {
         swapIntent.current!.intent = updated;
+
         dispatch({
           type: "setSimulation",
           payload: {
@@ -716,7 +626,7 @@ export function useDepositWidget(
         });
       }
     } catch (e) {
-      console.error(e);
+      console.error("Unable to refresh intent", e);
     } finally {
       dispatch({ type: "setSimulationLoading", payload: false });
       stopwatch.reset();
@@ -799,6 +709,7 @@ export function useDepositWidget(
     startTransaction,
     lastResult: state.lastResult,
     assetSelection,
+    isManualSelection,
     setAssetSelection,
     swapBalance,
     activeIntent,

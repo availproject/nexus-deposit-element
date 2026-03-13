@@ -59,9 +59,7 @@ export const clampAmountToMax = ({
 export const formatAmountForDisplay = (
   amount: bigint,
   decimals: number | undefined,
-  _nexusSDK: NexusSDK,
 ): string => {
-  void _nexusSDK;
   if (typeof decimals !== "number") return amount.toString();
   const formatted = formatUnits(amount, decimals);
   if (!formatted.includes(".")) return formatted;
